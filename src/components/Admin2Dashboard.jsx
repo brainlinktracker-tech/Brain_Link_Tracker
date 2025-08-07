@@ -7,6 +7,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Label } from './ui/label';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '../config';
+import TrackingLinksPage from './TrackingLinksPage'; // Import TrackingLinksPage
+import ClickAnalyticsTable from './ClickAnalyticsTable'; // Import ClickAnalyticsTable
+import CampaignOverview from './CampaignOverview'; // Import CampaignOverview
+import Geography from './Geography'; // Import Geography
 import { 
   Users, UserCheck, UserX, Shield, Briefcase, HardHat, 
   TrendingUp, Activity, BarChart3, Eye, Settings 
@@ -17,7 +21,11 @@ const Admin2Dashboard = ({ user, token }) => {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [newRole, setNewRole] = useState('');
+  const [newRole, setNewRole] = useState("");
+  const [newUsername, setNewUsername] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState("member");
 
   useEffect(() => {
     fetchUsers();
@@ -62,6 +70,38 @@ const Admin2Dashboard = ({ user, token }) => {
     }
   };
 
+  const createUser = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.REGISTER, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          username: newUsername,
+          email: newEmail,
+          password: newPassword,
+          role: newUserRole,
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('User created successfully');
+        fetchUsers();
+        setNewUsername('');
+        setNewEmail('');
+        setNewPassword('');
+        setNewUserRole('member');
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || 'Failed to create user');
+      }
+    } catch (error) {
+      toast.error('Network error');
+    }
+  };
+
   const approveUser = async (userId) => {
     try {
       const response = await fetch(`${API_ENDPOINTS.USERS}/${userId}/approve`, {
@@ -84,7 +124,7 @@ const Admin2Dashboard = ({ user, token }) => {
 
   const updateUserRole = async (userId, role) => {
     try {
-      const response = await fetch(`https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/admin/users/${userId}/role`, {
+      const response = await fetch(`${API_ENDPOINTS.USERS}/${userId}/role`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -130,8 +170,8 @@ const Admin2Dashboard = ({ user, token }) => {
     }
   };
 
-  // Filter users to only show those in Admin2's hierarchy
-  const myUsers = users.filter(u => u.parent_id === user.id || u.id === user.id);
+  // Filter users to show all except the main admin (assuming main admin has role 'admin' and a specific ID, e.g., 1)
+  const myUsers = users.filter(u => !(u.role === 'admin' && u.id === 1));
   const pendingUsers = myUsers.filter(u => u.status === 'pending');
   const activeUsers = myUsers.filter(u => u.status === 'active');
   const members = myUsers.filter(u => u.role === 'member');
@@ -166,7 +206,7 @@ const Admin2Dashboard = ({ user, token }) => {
               <Users className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm font-medium">Total Team Members</p>
-                <p className="text-2xl font-bold">{myUsers.length - 1}</p>
+                <p className="text-2xl font-bold">{myUsers.length}</p>
                 <p className="text-xs text-gray-500">Excluding yourself</p>
               </div>
             </div>
@@ -388,11 +428,12 @@ const Admin2Dashboard = ({ user, token }) => {
                                 value={newRole}
                                 onChange={(e) => setNewRole(e.target.value)}
                               >
+                                <option value="admin2">Admin 2</option>
                                 <option value="member">Member (Business Account)</option>
                                 <option value="worker">Worker (Employee)</option>
                               </select>
                               <p className="text-xs text-gray-500">
-                                Note: As Admin 2, you can only manage Members and Workers in your team
+                                Note: As Admin 2, you can manage other Admin 2s, Members, and Workers in your team
                               </p>
                             </div>
                             <div className="flex justify-end space-x-2">
@@ -423,22 +464,154 @@ const Admin2Dashboard = ({ user, token }) => {
         </CardContent>
       </Card>
 
+      {/* Create New Team Member */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Users className="h-5 w-5" />
+            <span>Create New Team Member</span>
+          </CardTitle>
+          <CardDescription>
+            Add new members or workers to your team (Admin 2 can create all roles except main admin)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="newUsername">Username</Label>
+              <input
+                id="newUsername"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter username"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newEmail">Email</Label>
+              <input
+                id="newEmail"
+                type="email"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">Password</Label>
+              <input
+                id="newPassword"
+                type="password"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="newUserRole">Role</Label>
+              <select
+                id="newUserRole"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={newUserRole}
+                onChange={(e) => setNewUserRole(e.target.value)}
+              >
+                <option value="admin2">Admin 2</option>
+                <option value="business">Business</option>
+                <option value="member">Member</option>
+                <option value="worker">Worker</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button onClick={createUser}>
+              Create User
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Tracking Links Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart3 className="h-5 w-5" />
+            <span>Tracking Links Management</span>
+          </CardTitle>
+          <CardDescription>
+            Manage and monitor all tracking links for your campaigns
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TrackingLinksPage />
+        </CardContent>
+      </Card>
+
+      {/* Click Analytics Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Activity className="h-5 w-5" />
+            <span>Click Analytics</span>
+          </CardTitle>
+          <CardDescription>
+            Detailed analytics and performance metrics for your campaigns
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ClickAnalyticsTable token={token} />
+        </CardContent>
+      </Card>
+
+      {/* Campaign Overview Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5" />
+            <span>Campaign Overview</span>
+          </CardTitle>
+          <CardDescription>
+            Comprehensive overview of all your campaigns and their performance
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CampaignOverview token={token} />
+        </CardContent>
+      </Card>
+
+      {/* Geography Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Eye className="h-5 w-5" />
+            <span>Geographic Analytics</span>
+          </CardTitle>
+          <CardDescription>
+            Geographic distribution and performance analysis of your campaigns
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Geography token={token} />
+        </CardContent>
+      </Card>
+
       {/* Restrictions Notice */}
       <Card className="border-orange-200 bg-orange-50">
         <CardContent className="p-4">
           <div className="flex items-start space-x-3">
             <Shield className="h-5 w-5 text-orange-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-orange-800">Admin 2 Access Restrictions</h4>
+              <h4 className="font-medium text-orange-800">Admin 2 Access Level</h4>
               <p className="text-sm text-orange-700 mt-1">
-                As a Business Manager (Admin 2), you have limited administrative access:
+                As an Admin 2, you have comprehensive access similar to the main admin with these capabilities:
               </p>
               <ul className="text-sm text-orange-700 mt-2 space-y-1">
-                <li>• Can only manage users in your team hierarchy</li>
-                <li>• Cannot create or manage other Admin 2 accounts</li>
-                <li>• Cannot modify system settings or core configurations</li>
-                <li>• Can approve and manage Members and Workers only</li>
-                <li>• Full access to team analytics and performance data</li>
+                <li>• Create and manage all user types except main admin</li>
+                <li>• Full access to analytics, campaigns, and tracking links</li>
+                <li>• Manage team members and their permissions</li>
+                <li>• Access to geographic and performance analytics</li>
+                <li>• Cannot delete or modify the main admin account</li>
               </ul>
             </div>
           </div>
@@ -449,4 +622,5 @@ const Admin2Dashboard = ({ user, token }) => {
 };
 
 export default Admin2Dashboard;
+
 

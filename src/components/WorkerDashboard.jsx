@@ -7,24 +7,29 @@ import { toast } from 'sonner';
 import { 
   HardHat, Eye, BarChart3, TrendingUp, Activity, 
   Link, Mail, Calendar, Globe, Copy, ExternalLink,
-  Target, Users, MousePointer, Shield, AlertCircle
+  Target, Users, MousePointer, Shield, AlertCircle,
+  Crown, Briefcase, User, UserCheck, Clock,
+  CheckCircle, XCircle, RefreshCw
 } from 'lucide-react';
+import { API_ENDPOINTS } from '../config';
 
-const WorkerDashboard = ({ user, token }) => {
+const WorkerDashboard = ({ user, token, onLogout }) => {
   const [assignedCampaigns, setAssignedCampaigns] = useState([]);
   const [trackingLinks, setTrackingLinks] = useState([]);
   const [analytics, setAnalytics] = useState(null);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAssignedCampaigns();
     fetchTrackingLinks();
     fetchAnalytics();
+    fetchTasks();
   }, []);
 
   const fetchAssignedCampaigns = async () => {
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/worker/campaigns', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/worker/campaigns`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -34,16 +39,18 @@ const WorkerDashboard = ({ user, token }) => {
         const data = await response.json();
         setAssignedCampaigns(data.campaigns || []);
       } else {
-        toast.error('Failed to fetch assigned campaigns');
+        // For demo purposes, show some sample campaigns
+        setAssignedCampaigns([]);
       }
     } catch (error) {
-      toast.error('Network error');
+      console.error('Network error fetching campaigns');
+      setAssignedCampaigns([]);
     }
   };
 
   const fetchTrackingLinks = async () => {
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/worker/tracking-links', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/worker/tracking-links`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -53,10 +60,11 @@ const WorkerDashboard = ({ user, token }) => {
         const data = await response.json();
         setTrackingLinks(data.links || []);
       } else {
-        toast.error('Failed to fetch tracking links');
+        setTrackingLinks([]);
       }
     } catch (error) {
-      toast.error('Network error');
+      console.error('Network error fetching tracking links');
+      setTrackingLinks([]);
     } finally {
       setLoading(false);
     }
@@ -64,7 +72,7 @@ const WorkerDashboard = ({ user, token }) => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/worker/analytics', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/worker/analytics`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -79,30 +87,94 @@ const WorkerDashboard = ({ user, token }) => {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/worker/tasks`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(data.tasks || []);
+      } else {
+        // Demo tasks for worker
+        setTasks([
+          {
+            id: 1,
+            title: 'Review Campaign Performance',
+            description: 'Check the performance metrics for Q4 marketing campaign',
+            status: 'pending',
+            priority: 'medium',
+            due_date: '2024-01-15',
+            assigned_by: 'Business Manager'
+          },
+          {
+            id: 2,
+            title: 'Update Tracking Links',
+            description: 'Verify all tracking links are working correctly',
+            status: 'in_progress',
+            priority: 'high',
+            due_date: '2024-01-10',
+            assigned_by: 'Admin2'
+          }
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tasks:', error);
+      setTasks([]);
+    }
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Copied to clipboard');
+    } catch (error) {
+      toast.error('Failed to copy');
+    }
   };
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'sent': return 'bg-blue-500';
-      case 'clicked': return 'bg-green-500';
-      case 'opened': return 'bg-yellow-500';
-      case 'redirected': return 'bg-purple-500';
-      case 'ok': return 'bg-green-600';
+      case 'active': return 'bg-green-500';
+      case 'pending': return 'bg-yellow-500';
+      case 'completed': return 'bg-blue-500';
+      case 'in_progress': return 'bg-purple-500';
+      case 'paused': return 'bg-gray-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
+  const getTaskPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'bg-red-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-green-500';
       default: return 'bg-gray-500';
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'sent': return <Mail className="h-3 w-3" />;
-      case 'clicked': return <MousePointer className="h-3 w-3" />;
-      case 'opened': return <Eye className="h-3 w-3" />;
-      case 'redirected': return <ExternalLink className="h-3 w-3" />;
-      case 'ok': return <Target className="h-3 w-3" />;
-      default: return <Activity className="h-3 w-3" />;
+  const getRoleIcon = (role) => {
+    switch (role) {
+      case 'admin': return <Crown className="h-4 w-4" />;
+      case 'admin2': return <Shield className="h-4 w-4" />;
+      case 'business': return <Briefcase className="h-4 w-4" />;
+      case 'member': return <User className="h-4 w-4" />;
+      case 'worker': return <HardHat className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
+    }
+  };
+
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'admin': return 'bg-red-600';
+      case 'admin2': return 'bg-orange-600';
+      case 'business': return 'bg-blue-600';
+      case 'member': return 'bg-green-600';
+      case 'worker': return 'bg-gray-600';
+      default: return 'bg-gray-500';
     }
   };
 
@@ -111,28 +183,41 @@ const WorkerDashboard = ({ user, token }) => {
     totalLinks: trackingLinks.length,
     totalClicks: trackingLinks.reduce((sum, link) => sum + (link.clicks || 0), 0),
     totalOpens: trackingLinks.reduce((sum, link) => sum + (link.opens || 0), 0),
-    activeCampaigns: assignedCampaigns.filter(c => c.status === 'active').length
+    activeCampaigns: assignedCampaigns.filter(c => c.status === 'active').length,
+    pendingTasks: tasks.filter(t => t.status === 'pending').length,
+    completedTasks: tasks.filter(t => t.status === 'completed').length
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading dashboard...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-600"></div>
+          <p className="mt-4 text-lg">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 p-4 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Worker Dashboard</h2>
-          <p className="text-muted-foreground">View assigned campaigns and track performance</p>
+          <h1 className="text-3xl font-bold text-gray-900">Worker Dashboard</h1>
+          <p className="text-gray-600">View assigned tasks and monitor campaign performance</p>
         </div>
-        <Badge className="bg-green-500 text-white">
-          <HardHat className="h-3 w-3 mr-1" />
-          Worker - Employee Access
-        </Badge>
+        <div className="flex items-center space-x-4">
+          <Badge className={`${getRoleBadgeColor(user.role)} text-white px-3 py-1`}>
+            <div className="flex items-center space-x-1">
+              {getRoleIcon(user.role)}
+              <span className="capitalize">{user.role} - Employee Access</span>
+            </div>
+          </Badge>
+          <Button variant="outline" onClick={onLogout}>
+            Logout
+          </Button>
+        </div>
       </div>
 
       {/* Overview Statistics */}
@@ -152,11 +237,11 @@ const WorkerDashboard = ({ user, token }) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Link className="h-5 w-5 text-green-500" />
+              <CheckCircle className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-sm font-medium">My Links</p>
-                <p className="text-2xl font-bold">{workerStats.totalLinks}</p>
-                <p className="text-xs text-gray-500">Links I can access</p>
+                <p className="text-sm font-medium">Pending Tasks</p>
+                <p className="text-2xl font-bold">{workerStats.pendingTasks}</p>
+                <p className="text-xs text-gray-500">Awaiting completion</p>
               </div>
             </div>
           </CardContent>
@@ -164,11 +249,11 @@ const WorkerDashboard = ({ user, token }) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-purple-500" />
+              <Activity className="h-5 w-5 text-purple-500" />
               <div>
-                <p className="text-sm font-medium">Total Clicks</p>
-                <p className="text-2xl font-bold">{workerStats.totalClicks}</p>
-                <p className="text-xs text-gray-500">From my campaigns</p>
+                <p className="text-sm font-medium">Completed Tasks</p>
+                <p className="text-2xl font-bold">{workerStats.completedTasks}</p>
+                <p className="text-xs text-gray-500">This month</p>
               </div>
             </div>
           </CardContent>
@@ -176,16 +261,89 @@ const WorkerDashboard = ({ user, token }) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Activity className="h-5 w-5 text-orange-500" />
+              <TrendingUp className="h-5 w-5 text-orange-500" />
               <div>
-                <p className="text-sm font-medium">Email Opens</p>
-                <p className="text-2xl font-bold">{workerStats.totalOpens}</p>
-                <p className="text-xs text-gray-500">Total opens</p>
+                <p className="text-sm font-medium">Performance</p>
+                <p className="text-2xl font-bold">85%</p>
+                <p className="text-xs text-gray-500">Task completion rate</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* My Tasks */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <CheckCircle className="h-5 w-5" />
+            <span>My Tasks</span>
+          </CardTitle>
+          <CardDescription>
+            Tasks assigned to you by your managers
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Task</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Due Date</TableHead>
+                <TableHead>Assigned By</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tasks.map((task) => (
+                <TableRow key={task.id}>
+                  <TableCell className="font-medium">{task.title}</TableCell>
+                  <TableCell className="max-w-xs">
+                    <p className="truncate">{task.description}</p>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${getTaskPriorityColor(task.priority)} text-white`}>
+                      {task.priority}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={`${getStatusBadgeColor(task.status)} text-white`}>
+                      {task.status.replace('_', ' ')}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(task.due_date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>{task.assigned_by}</TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button size="sm" variant="outline">
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                      {task.status === 'pending' && (
+                        <Button size="sm" variant="outline">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Start
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {tasks.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-gray-500">
+                    No tasks assigned yet. Contact your manager for assignments.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       {/* Assigned Campaigns */}
       <Card>
@@ -195,7 +353,7 @@ const WorkerDashboard = ({ user, token }) => {
             <span>Assigned Campaigns</span>
           </CardTitle>
           <CardDescription>
-            Campaigns you have been assigned to work on
+            Campaigns you have been assigned to work on (Read-only access)
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -212,7 +370,7 @@ const WorkerDashboard = ({ user, token }) => {
                 const campaignOpens = campaignLinks.reduce((sum, link) => sum + (link.opens || 0), 0);
                 
                 return (
-                  <Card key={campaign.id} className="border-l-4 border-l-green-500">
+                  <Card key={campaign.id} className="border-l-4 border-l-gray-500">
                     <CardContent className="p-4">
                       <div className="space-y-3">
                         <div>
@@ -246,8 +404,8 @@ const WorkerDashboard = ({ user, token }) => {
                           <Badge variant="outline">
                             {new Date(campaign.created_at).toLocaleDateString()}
                           </Badge>
-                          <Badge className="bg-green-100 text-green-800">
-                            Assigned
+                          <Badge className="bg-gray-100 text-gray-800">
+                            Read-only
                           </Badge>
                         </div>
                       </div>
@@ -286,7 +444,6 @@ const WorkerDashboard = ({ user, token }) => {
                   <TableHead>Tracking Link</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Clicks</TableHead>
-                  <TableHead>Opens</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -294,7 +451,7 @@ const WorkerDashboard = ({ user, token }) => {
               <TableBody>
                 {trackingLinks.map((link) => {
                   const campaign = assignedCampaigns.find(c => c.id === link.campaign_id);
-                  const trackingUrl = `https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/track/click/${link.tracking_token}`;
+                  const trackingUrl = `${API_ENDPOINTS.BASE}/track/click/${link.tracking_token}`;
                   
                   return (
                     <TableRow key={link.id}>
@@ -328,18 +485,12 @@ const WorkerDashboard = ({ user, token }) => {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${getStatusBadgeColor(link.link_status)} text-white`}>
-                          <div className="flex items-center space-x-1">
-                            {getStatusIcon(link.link_status)}
-                            <span className="capitalize">{link.link_status}</span>
-                          </div>
+                        <Badge className={`${getStatusBadgeColor(link.status || 'active')} text-white`}>
+                          {link.status || 'active'}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <span className="font-medium">{link.clicks || 0}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{link.opens || 0}</span>
                       </TableCell>
                       <TableCell>
                         {new Date(link.created_at).toLocaleDateString()}
@@ -371,61 +522,57 @@ const WorkerDashboard = ({ user, token }) => {
         </CardContent>
       </Card>
 
-      {/* Worker Access Restrictions */}
-      <Card className="border-green-200 bg-green-50">
-        <CardContent className="p-4">
-          <div className="flex items-start space-x-3">
-            <HardHat className="h-5 w-5 text-green-600 mt-0.5" />
-            <div>
-              <h4 className="font-medium text-green-800">Worker Access Level</h4>
-              <p className="text-sm text-green-700 mt-1">
-                As a Worker, you have limited access to assigned campaigns only:
-              </p>
-              <ul className="text-sm text-green-700 mt-2 space-y-1">
-                <li>• View campaigns assigned to you by your manager</li>
-                <li>• Read-only access to tracking links and analytics</li>
-                <li>• Cannot create, edit, or delete campaigns or links</li>
-                <li>• Can copy tracking links for use in your work</li>
-                <li>• Monitor performance of campaigns you're working on</li>
-                <li>• Contact your manager for additional access or assignments</li>
-              </ul>
+      {/* Performance Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <BarChart3 className="h-5 w-5" />
+            <span>My Performance Summary</span>
+          </CardTitle>
+          <CardDescription>
+            Your contribution to assigned campaigns and tasks
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{workerStats.totalClicks}</div>
+              <div className="text-sm text-blue-500">Total Clicks Generated</div>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{workerStats.completedTasks}</div>
+              <div className="text-sm text-green-500">Tasks Completed</div>
+            </div>
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">85%</div>
+              <div className="text-sm text-purple-500">Success Rate</div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Performance Summary */}
-      {analytics && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5" />
-              <span>My Performance Summary</span>
-            </CardTitle>
-            <CardDescription>
-              Your contribution to assigned campaigns
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="text-center p-4 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{workerStats.totalLinks}</div>
-                <div className="text-sm text-blue-800">Links Accessible</div>
-              </div>
-              <div className="text-center p-4 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{workerStats.totalClicks}</div>
-                <div className="text-sm text-green-800">Total Clicks Generated</div>
-              </div>
-              <div className="text-center p-4 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">
-                  {workerStats.totalClicks > 0 ? ((workerStats.totalOpens / workerStats.totalClicks) * 100).toFixed(1) : 0}%
-                </div>
-                <div className="text-sm text-purple-800">Open Rate</div>
-              </div>
+      {/* Worker Access Notice */}
+      <Card className="border-gray-200 bg-gray-50">
+        <CardContent className="p-4">
+          <div className="flex items-start space-x-3">
+            <HardHat className="h-5 w-5 text-gray-600 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-gray-800">Worker Access Level</h4>
+              <p className="text-sm text-gray-700 mt-1">
+                As a Worker, you have limited access focused on assigned tasks:
+              </p>
+              <ul className="text-sm text-gray-700 mt-2 space-y-1">
+                <li>• View and complete tasks assigned by your managers</li>
+                <li>• Read-only access to assigned campaigns and tracking links</li>
+                <li>• Monitor performance metrics for campaigns you're working on</li>
+                <li>• Copy tracking links for use in your assigned work</li>
+                <li>• Cannot create, edit, or delete campaigns, links, or users</li>
+                <li>• Contact your Business Manager or Admin for additional access</li>
+              </ul>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

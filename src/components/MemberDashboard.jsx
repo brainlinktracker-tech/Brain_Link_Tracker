@@ -8,22 +8,25 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { toast } from 'sonner';
-import PasswordChangeModal from './PasswordChangeModal';
+import TrackingLinksPage from './TrackingLinksPage';
+import ClickAnalyticsTable from './ClickAnalyticsTable';
+import CampaignOverview from './CampaignOverview';
+import Geography from './Geography';
 import { 
   User, Plus, Eye, BarChart3, TrendingUp, Activity, 
   Link, Mail, Calendar, Globe, Copy, ExternalLink,
   Target, Users, MousePointer, Shield, AlertCircle,
-  FolderPlus, Settings, Trash2, Edit, Play, Pause
+  FolderPlus, Settings, Trash2, Edit, Play, Pause,
+  Crown, Briefcase, HardHat, UserCheck
 } from 'lucide-react';
+import { API_ENDPOINTS } from '../config';
 
-const MemberDashboard = ({ user, token }) => {
+const MemberDashboard = ({ user, token, onLogout }) => {
   const [campaigns, setCampaigns] = useState([]);
   const [trackingLinks, setTrackingLinks] = useState([]);
-  const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [showCreateCampaign, setShowCreateCampaign] = useState(false);
-  const [showCreateLink, setShowCreateLink] = useState(false);
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
   const [newCampaign, setNewCampaign] = useState({
     name: '',
     description: '',
@@ -44,7 +47,7 @@ const MemberDashboard = ({ user, token }) => {
 
   const fetchCampaigns = async () => {
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/campaigns', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/campaigns`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -64,8 +67,8 @@ const MemberDashboard = ({ user, token }) => {
   const fetchTrackingLinks = async (campaignId = null) => {
     try {
       const url = campaignId 
-        ? `https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/campaigns/${campaignId}/tracking-links`
-        : 'https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/tracking-links';
+        ? `${API_ENDPOINTS.BASE}/campaigns/${campaignId}/tracking-links`
+        : `${API_ENDPOINTS.BASE}/tracking-links`;
         
       const response = await fetch(url, {
         headers: {
@@ -88,7 +91,7 @@ const MemberDashboard = ({ user, token }) => {
 
   const fetchAnalytics = async () => {
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/analytics', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/analytics`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -104,8 +107,13 @@ const MemberDashboard = ({ user, token }) => {
   };
 
   const createCampaign = async () => {
+    if (!newCampaign.name || !newCampaign.target_url) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/campaigns', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/campaigns`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -116,7 +124,6 @@ const MemberDashboard = ({ user, token }) => {
 
       if (response.ok) {
         toast.success('Campaign created successfully');
-        setShowCreateCampaign(false);
         setNewCampaign({ name: '', description: '', target_url: '', status: 'active' });
         fetchCampaigns();
       } else {
@@ -129,8 +136,13 @@ const MemberDashboard = ({ user, token }) => {
   };
 
   const createTrackingLink = async () => {
+    if (!newLink.original_url) {
+      toast.error('Please enter a URL');
+      return;
+    }
+
     try {
-      const response = await fetch('https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/tracking-links', {
+      const response = await fetch(`${API_ENDPOINTS.BASE}/tracking-links`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -142,9 +154,8 @@ const MemberDashboard = ({ user, token }) => {
       if (response.ok) {
         const data = await response.json();
         toast.success('Tracking link created successfully');
-        setShowCreateLink(false);
         setNewLink({ original_url: '', email: '', campaign_id: '' });
-        fetchTrackingLinks(selectedCampaign?.id);
+        fetchTrackingLinks();
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to create tracking link');
@@ -154,136 +165,79 @@ const MemberDashboard = ({ user, token }) => {
     }
   };
 
-  const toggleCampaignStatus = async (campaignId, currentStatus) => {
+  const copyToClipboard = async (text) => {
     try {
-      const newStatus = currentStatus === 'active' ? 'paused' : 'active';
-      const response = await fetch(`https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/campaigns/${campaignId}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (response.ok) {
-        toast.success(`Campaign ${newStatus === 'active' ? 'activated' : 'paused'}`);
-        fetchCampaigns();
-      } else {
-        toast.error('Failed to update campaign status');
-      }
+      await navigator.clipboard.writeText(text);
+      toast.success('Copied to clipboard');
     } catch (error) {
-      toast.error('Network error');
+      toast.error('Failed to copy');
     }
   };
 
-  const deleteCampaign = async (campaignId) => {
-    if (!confirm('Are you sure you want to delete this campaign? This will also delete all associated tracking links.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/api/campaigns/${campaignId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        toast.success('Campaign deleted successfully');
-        fetchCampaigns();
-        if (selectedCampaign?.id === campaignId) {
-          setSelectedCampaign(null);
-          fetchTrackingLinks();
-        }
-      } else {
-        toast.error('Failed to delete campaign');
-      }
-    } catch (error) {
-      toast.error('Network error');
+  const getRoleIcon = (role) => {
+    switch (role) {
+      case 'admin': return <Crown className="h-4 w-4" />;
+      case 'admin2': return <Shield className="h-4 w-4" />;
+      case 'business': return <Briefcase className="h-4 w-4" />;
+      case 'member': return <User className="h-4 w-4" />;
+      case 'worker': return <HardHat className="h-4 w-4" />;
+      default: return <User className="h-4 w-4" />;
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard');
-  };
-
-  const getStatusBadgeColor = (status) => {
-    switch (status) {
-      case 'sent': return 'bg-blue-500';
-      case 'clicked': return 'bg-green-500';
-      case 'opened': return 'bg-yellow-500';
-      case 'redirected': return 'bg-purple-500';
-      case 'ok': return 'bg-green-600';
-      case 'blocked': return 'bg-red-500';
-      case 'error': return 'bg-red-600';
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'admin': return 'bg-red-600';
+      case 'admin2': return 'bg-orange-600';
+      case 'business': return 'bg-blue-600';
+      case 'member': return 'bg-green-600';
+      case 'worker': return 'bg-gray-600';
       default: return 'bg-gray-500';
     }
   };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'sent': return <Mail className="h-3 w-3" />;
-      case 'clicked': return <MousePointer className="h-3 w-3" />;
-      case 'opened': return <Eye className="h-3 w-3" />;
-      case 'redirected': return <ExternalLink className="h-3 w-3" />;
-      case 'ok': return <Target className="h-3 w-3" />;
-      case 'blocked': return <Shield className="h-3 w-3" />;
-      case 'error': return <AlertCircle className="h-3 w-3" />;
-      default: return <Activity className="h-3 w-3" />;
-    }
-  };
-
-  // Calculate member-specific statistics
-  const memberStats = {
-    totalCampaigns: campaigns.length,
-    activeCampaigns: campaigns.filter(c => c.status === 'active').length,
-    totalLinks: trackingLinks.length,
-    totalClicks: trackingLinks.reduce((sum, link) => sum + (link.clicks || 0), 0),
-    totalOpens: trackingLinks.reduce((sum, link) => sum + (link.opens || 0), 0)
-  };
-
-  // Filter links by selected campaign
-  const filteredLinks = selectedCampaign 
-    ? trackingLinks.filter(link => link.campaign_id === selectedCampaign.id)
-    : trackingLinks;
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading dashboard...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-green-600"></div>
+          <p className="mt-4 text-lg">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gray-50 p-4 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Member Dashboard</h2>
-          <p className="text-muted-foreground">Manage your campaigns and tracking links</p>
+          <h1 className="text-3xl font-bold text-gray-900">Member Dashboard</h1>
+          <p className="text-gray-600">Manage your personal campaigns and track performance</p>
         </div>
-        <div className="flex items-center space-x-3">
-          <PasswordChangeModal token={token} />
-          <Badge className="bg-blue-500 text-white">
-            <User className="h-3 w-3 mr-1" />
-            Member - Full Access
+        <div className="flex items-center space-x-4">
+          <Badge className={`${getRoleBadgeColor(user.role)} text-white px-3 py-1`}>
+            <div className="flex items-center space-x-1">
+              {getRoleIcon(user.role)}
+              <span className="capitalize">{user.role} - Individual User</span>
+            </div>
           </Badge>
+          <Button variant="outline" onClick={onLogout}>
+            Logout
+          </Button>
         </div>
       </div>
 
       {/* Overview Statistics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Target className="h-5 w-5 text-blue-500" />
+              <Target className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-sm font-medium">Total Campaigns</p>
-                <p className="text-2xl font-bold">{memberStats.totalCampaigns}</p>
-                <p className="text-xs text-gray-500">{memberStats.activeCampaigns} active</p>
+                <p className="text-sm font-medium">My Campaigns</p>
+                <p className="text-2xl font-bold">{campaigns.length}</p>
+                <p className="text-xs text-gray-500">Personal campaigns</p>
               </div>
             </div>
           </CardContent>
@@ -291,11 +245,11 @@ const MemberDashboard = ({ user, token }) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <Link className="h-5 w-5 text-green-500" />
+              <Link className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="text-sm font-medium">Tracking Links</p>
-                <p className="text-2xl font-bold">{memberStats.totalLinks}</p>
-                <p className="text-xs text-gray-500">All campaigns</p>
+                <p className="text-2xl font-bold">{trackingLinks.length}</p>
+                <p className="text-xs text-gray-500">Generated links</p>
               </div>
             </div>
           </CardContent>
@@ -303,11 +257,11 @@ const MemberDashboard = ({ user, token }) => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-purple-500" />
+              <MousePointer className="h-5 w-5 text-purple-500" />
               <div>
                 <p className="text-sm font-medium">Total Clicks</p>
-                <p className="text-2xl font-bold">{memberStats.totalClicks}</p>
-                <p className="text-xs text-gray-500">All time</p>
+                <p className="text-2xl font-bold">{analytics?.overview?.totalClicks || 0}</p>
+                <p className="text-xs text-gray-500">All campaigns</p>
               </div>
             </div>
           </CardContent>
@@ -317,411 +271,308 @@ const MemberDashboard = ({ user, token }) => {
             <div className="flex items-center space-x-2">
               <Activity className="h-5 w-5 text-orange-500" />
               <div>
-                <p className="text-sm font-medium">Email Opens</p>
-                <p className="text-2xl font-bold">{memberStats.totalOpens}</p>
-                <p className="text-xs text-gray-500">Total opens</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <BarChart3 className="h-5 w-5 text-red-500" />
-              <div>
-                <p className="text-sm font-medium">Conversion Rate</p>
-                <p className="text-2xl font-bold">
-                  {memberStats.totalOpens > 0 ? ((memberStats.totalClicks / memberStats.totalOpens) * 100).toFixed(1) : 0}%
-                </p>
-                <p className="text-xs text-gray-500">Click/Open ratio</p>
+                <p className="text-sm font-medium">Active Links</p>
+                <p className="text-2xl font-bold">{trackingLinks.filter(link => link.status === 'active').length}</p>
+                <p className="text-xs text-gray-500">Currently active</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Campaign Management */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Target className="h-5 w-5" />
-                <span>Campaign Management</span>
-              </CardTitle>
-              <CardDescription>
-                Create and manage your marketing campaigns
-              </CardDescription>
-            </div>
-            <Dialog open={showCreateCampaign} onOpenChange={setShowCreateCampaign}>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Target className="h-5 w-5" />
+              <span>Create New Campaign</span>
+            </CardTitle>
+            <CardDescription>
+              Set up a new marketing campaign to track your links
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Dialog>
               <DialogTrigger asChild>
-                <Button>
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  New Campaign
+                <Button className="w-full">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Campaign
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create New Campaign</DialogTitle>
                   <DialogDescription>
-                    Set up a new marketing campaign to organize your tracking links
+                    Set up a new campaign to organize your tracking links
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div>
-                    <Label htmlFor="campaign-name">Campaign Name</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="campaignName">Campaign Name</Label>
                     <Input
-                      id="campaign-name"
+                      id="campaignName"
+                      placeholder="Enter campaign name"
                       value={newCampaign.name}
                       onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
-                      placeholder="e.g., Summer Sale 2024"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="campaign-description">Description</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="campaignDescription">Description</Label>
                     <Textarea
-                      id="campaign-description"
+                      id="campaignDescription"
+                      placeholder="Enter campaign description"
                       value={newCampaign.description}
                       onChange={(e) => setNewCampaign({...newCampaign, description: e.target.value})}
-                      placeholder="Brief description of the campaign"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="campaign-url">Target URL (Optional)</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="campaignUrl">Target URL</Label>
                     <Input
-                      id="campaign-url"
+                      id="campaignUrl"
+                      placeholder="https://example.com"
                       value={newCampaign.target_url}
                       onChange={(e) => setNewCampaign({...newCampaign, target_url: e.target.value})}
-                      placeholder="https://example.com/landing-page"
                     />
                   </div>
-                  <Button onClick={createCampaign} className="w-full">
-                    Create Campaign
-                  </Button>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setNewCampaign({ name: '', description: '', target_url: '', status: 'active' })}>
+                      Cancel
+                    </Button>
+                    <Button onClick={createCampaign}>
+                      Create Campaign
+                    </Button>
+                  </div>
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {campaigns.length === 0 ? (
-            <div className="text-center py-8">
-              <Target className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No campaigns yet. Create your first campaign to get started.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {campaigns.map((campaign) => {
-                const campaignLinks = trackingLinks.filter(link => link.campaign_id === campaign.id);
-                const campaignClicks = campaignLinks.reduce((sum, link) => sum + (link.clicks || 0), 0);
-                const campaignOpens = campaignLinks.reduce((sum, link) => sum + (link.opens || 0), 0);
-                
-                return (
-                  <Card 
-                    key={campaign.id} 
-                    className={`cursor-pointer transition-all ${
-                      selectedCampaign?.id === campaign.id 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'hover:shadow-md'
-                    }`}
-                    onClick={() => {
-                      setSelectedCampaign(campaign);
-                      fetchTrackingLinks(campaign.id);
-                    }}
-                  >
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h4 className="font-semibold">{campaign.name}</h4>
-                            <p className="text-sm text-gray-500">{campaign.description || 'No description'}</p>
-                          </div>
-                          <Badge 
-                            variant="outline" 
-                            className={campaign.status === 'active' ? 'text-green-600' : 'text-gray-600'}
-                          >
-                            {campaign.status}
-                          </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <div>
-                            <span className="text-gray-500">Links:</span>
-                            <span className="ml-1 font-medium">{campaignLinks.length}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">Clicks:</span>
-                            <span className="ml-1 font-medium">{campaignClicks}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">Opens:</span>
-                            <span className="ml-1 font-medium">{campaignOpens}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500">Rate:</span>
-                            <span className="ml-1 font-medium">
-                              {campaignOpens > 0 ? ((campaignClicks / campaignOpens) * 100).toFixed(1) : 0}%
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <Badge variant="outline">
-                            {new Date(campaign.created_at).toLocaleDateString()}
-                          </Badge>
-                          <div className="flex space-x-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleCampaignStatus(campaign.id, campaign.status);
-                              }}
-                            >
-                              {campaign.status === 'active' ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteCampaign(campaign.id);
-                              }}
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Tracking Links Management */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Link className="h-5 w-5" />
-                <span>
-                  Tracking Links 
-                  {selectedCampaign && ` - ${selectedCampaign.name}`}
-                </span>
-              </CardTitle>
-              <CardDescription>
-                {selectedCampaign 
-                  ? `Manage tracking links for ${selectedCampaign.name}` 
-                  : 'All tracking links across campaigns'
-                }
-              </CardDescription>
-            </div>
-            <div className="flex space-x-2">
-              {selectedCampaign && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedCampaign(null);
-                    fetchTrackingLinks();
-                  }}
-                >
-                  View All Links
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Link className="h-5 w-5" />
+              <span>Generate Tracking Link</span>
+            </CardTitle>
+            <CardDescription>
+              Create a new tracking link for your campaigns
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button className="w-full" variant="outline">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Generate Link
                 </Button>
-              )}
-              <Dialog open={showCreateLink} onOpenChange={setShowCreateLink}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Link
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Create Tracking Link</DialogTitle>
-                    <DialogDescription>
-                      Generate a new tracking link for your campaign
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="link-url">Original URL</Label>
-                      <Input
-                        id="link-url"
-                        value={newLink.original_url}
-                        onChange={(e) => setNewLink({...newLink, original_url: e.target.value})}
-                        placeholder="https://example.com/page"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="link-email">Recipient Email (Optional)</Label>
-                      <Input
-                        id="link-email"
-                        value={newLink.email}
-                        onChange={(e) => setNewLink({...newLink, email: e.target.value})}
-                        placeholder="recipient@example.com"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="link-campaign">Campaign</Label>
-                      <select
-                        id="link-campaign"
-                        value={newLink.campaign_id}
-                        onChange={(e) => setNewLink({...newLink, campaign_id: e.target.value})}
-                        className="w-full p-2 border rounded"
-                      >
-                        <option value="">Select Campaign</option>
-                        {campaigns.map(campaign => (
-                          <option key={campaign.id} value={campaign.id}>
-                            {campaign.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <Button onClick={createTrackingLink} className="w-full">
-                      Generate Tracking Link
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Generate Tracking Link</DialogTitle>
+                  <DialogDescription>
+                    Create a new tracking link for your campaign
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="linkUrl">Original URL</Label>
+                    <Input
+                      id="linkUrl"
+                      placeholder="https://example.com"
+                      value={newLink.original_url}
+                      onChange={(e) => setNewLink({...newLink, original_url: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkEmail">Email (Optional)</Label>
+                    <Input
+                      id="linkEmail"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={newLink.email}
+                      onChange={(e) => setNewLink({...newLink, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkCampaign">Campaign (Optional)</Label>
+                    <select
+                      id="linkCampaign"
+                      className="w-full p-2 border rounded-md"
+                      value={newLink.campaign_id}
+                      onChange={(e) => setNewLink({...newLink, campaign_id: e.target.value})}
+                    >
+                      <option value="">Select a campaign</option>
+                      {campaigns.map((campaign) => (
+                        <option key={campaign.id} value={campaign.id}>
+                          {campaign.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <Button variant="outline" onClick={() => setNewLink({ original_url: '', email: '', campaign_id: '' })}>
+                      Cancel
+                    </Button>
+                    <Button onClick={createTrackingLink}>
+                      Generate Link
                     </Button>
                   </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* My Campaigns */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Target className="h-5 w-5" />
+            <span>My Campaigns</span>
+          </CardTitle>
+          <CardDescription>
+            Overview of all your personal campaigns
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {filteredLinks.length === 0 ? (
-            <div className="text-center py-8">
-              <Link className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">
-                {selectedCampaign 
-                  ? `No tracking links in ${selectedCampaign.name} yet.`
-                  : 'No tracking links created yet.'
-                } Create your first link to get started.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Campaign</TableHead>
-                  <TableHead>Original URL</TableHead>
-                  <TableHead>Tracking Link</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Clicks</TableHead>
-                  <TableHead>Opens</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Campaign Name</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Target URL</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {campaigns.map((campaign) => (
+                <TableRow key={campaign.id}>
+                  <TableCell className="font-medium">{campaign.name}</TableCell>
+                  <TableCell>{campaign.description}</TableCell>
+                  <TableCell>
+                    <a href={campaign.target_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                      {campaign.target_url}
+                    </a>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={campaign.status === 'active' ? 'default' : 'secondary'}>
+                      {campaign.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {new Date(campaign.created_at).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button size="sm" variant="outline" onClick={() => setSelectedCampaign(campaign)}>
+                        <Eye className="h-3 w-3 mr-1" />
+                        View
+                      </Button>
+                      <Button size="sm" variant="outline">
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLinks.map((link) => {
-                  const campaign = campaigns.find(c => c.id === link.campaign_id);
-                  const trackingUrl = `https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/track/click/${link.tracking_token}`;
-                  const pixelUrl = `https://5000-i3axerqweb415mh7wgsgs-15aa9b1c.manus.computer/track/pixel/${link.tracking_token}`;
-                  
-                  return (
-                    <TableRow key={link.id}>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {campaign ? campaign.name : 'Unknown'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs truncate">
-                        <a 
-                          href={link.original_url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {link.original_url}
-                        </a>
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="flex items-center space-x-2">
-                          <span className="truncate text-sm font-mono">
-                            {trackingUrl}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => copyToClipboard(trackingUrl)}
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={`${getStatusBadgeColor(link.link_status)} text-white`}>
-                          <div className="flex items-center space-x-1">
-                            {getStatusIcon(link.link_status)}
-                            <span className="capitalize">{link.link_status}</span>
-                          </div>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{link.clicks || 0}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{link.opens || 0}</span>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(link.created_at).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => copyToClipboard(trackingUrl)}
-                            title="Copy tracking link"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => copyToClipboard(pixelUrl)}
-                            title="Copy pixel URL"
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(link.original_url, '_blank')}
-                            title="Open original URL"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
+              ))}
+              {campaigns.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center text-gray-500">
+                    No campaigns found. Create your first campaign above.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
-      {/* Member Access Information */}
-      <Card className="border-blue-200 bg-blue-50">
+      {/* Tracking Links Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Link className="h-5 w-5" />
+            <span>My Tracking Links</span>
+          </CardTitle>
+          <CardDescription>
+            Manage and monitor all your tracking links
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <TrackingLinksPage />
+        </CardContent>
+      </Card>
+
+      {/* Click Analytics Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Activity className="h-5 w-5" />
+            <span>Click Analytics</span>
+          </CardTitle>
+          <CardDescription>
+            Detailed analytics and performance metrics for your campaigns
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ClickAnalyticsTable token={token} />
+        </CardContent>
+      </Card>
+
+      {/* Campaign Overview Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <TrendingUp className="h-5 w-5" />
+            <span>Performance Overview</span>
+          </CardTitle>
+          <CardDescription>
+            Comprehensive overview of your campaign performance
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CampaignOverview token={token} />
+        </CardContent>
+      </Card>
+
+      {/* Geography Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Globe className="h-5 w-5" />
+            <span>Geographic Analytics</span>
+          </CardTitle>
+          <CardDescription>
+            Geographic distribution and performance analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Geography token={token} />
+        </CardContent>
+      </Card>
+
+      {/* Member Access Notice */}
+      <Card className="border-green-200 bg-green-50">
         <CardContent className="p-4">
           <div className="flex items-start space-x-3">
-            <User className="h-5 w-5 text-blue-600 mt-0.5" />
+            <User className="h-5 w-5 text-green-600 mt-0.5" />
             <div>
-              <h4 className="font-medium text-blue-800">Member Access Level</h4>
-              <p className="text-sm text-blue-700 mt-1">
-                As a Member, you have full access to campaign and link management:
+              <h4 className="font-medium text-green-800">Member Account Capabilities</h4>
+              <p className="text-sm text-green-700 mt-1">
+                As a Member account holder, you have the following capabilities:
               </p>
-              <ul className="text-sm text-blue-700 mt-2 space-y-1">
-                <li>• Create and manage unlimited campaigns</li>
+              <ul className="text-sm text-green-700 mt-2 space-y-1">
+                <li>• Create and manage personal campaigns</li>
                 <li>• Generate unlimited tracking links</li>
-                <li>• View detailed analytics and performance metrics</li>
-                <li>• Organize links by campaigns for better management</li>
-                <li>• Access to advanced tracking status reporting</li>
-                <li>• Export data and manage campaign settings</li>
+                <li>• Access detailed click analytics and performance metrics</li>
+                <li>• View geographic distribution of your audience</li>
+                <li>• Monitor campaign performance in real-time</li>
+                <li>• Export analytics data for external analysis</li>
               </ul>
             </div>
           </div>
