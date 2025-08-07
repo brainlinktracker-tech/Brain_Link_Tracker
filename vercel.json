@@ -4,7 +4,7 @@
     {
       "src": "api/index.py",
       "use": "@vercel/python",
-      "runtimes": ["python3.11"]
+      "config": { "pythonVersion": "3.11" }
     },
     {
       "src": "package.json",
@@ -23,5 +23,4 @@
     }
   ]
 }
-
 
