@@ -31,7 +31,7 @@ except ImportError:
     DATABASE_TYPE = "sqlite"
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), '..', 'static'))
-CORS(app, origins="*")
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Configuration
 SECRET_KEY = os.environ.get("SECRET_KEY", "ej5B3Amppi4gjpbC65te6rJuvJzgVCWW_xfB-ZLR1TE")
@@ -294,9 +294,20 @@ def init_db():
         return False
 
 # Authentication decorator
+def handle_options(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return jsonify({"message": "OK"}), 200
+        return f(*args, **kwargs)
+    return decorated_function
+
 def require_auth(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        if request.method == "OPTIONS":
+            return jsonify({"message": "OK"}), 200
+            
         session_token = request.headers.get("Authorization")
         if not session_token:
             return jsonify({"error": "No authorization token provided"}), 401
@@ -349,20 +360,7 @@ def require_auth(f):
     
     return decorated_function
 
-# Frontend serving routes
-@app.route("/")
-def serve_frontend():
-    """Serve the main frontend page"""
-    return send_from_directory(app.static_folder, "index.html")
 
-@app.route("/<path:path>")
-def serve_static_files(path):
-    """Serve static files"""
-    try:
-        return send_from_directory(app.static_folder, path)
-    except:
-        # If file not found, serve index.html for SPA routing
-        return send_from_directory(app.static_folder, "index.html")
 
 # Health check endpoint
 @app.route("/api/health")
@@ -376,7 +374,8 @@ def health_check():
     })
 
 # Authentication endpoints
-@app.route("/api/auth/login", methods=["POST"])
+@app.route("/api/auth/login", methods=["POST", "OPTIONS"])
+@handle_options
 def login():
     """User login endpoint"""
     try:
@@ -447,7 +446,7 @@ def login():
         print(f"Login error: {e}")
         return jsonify({"error": "An error occurred during login"}), 500
 
-@app.route("/api/auth/logout", methods=["POST"])
+@app.route("/api/auth/logout", methods=["POST", "OPTIONS"])
 @require_auth
 def logout():
     """User logout endpoint"""
@@ -469,7 +468,8 @@ def logout():
         print(f"Logout error: {e}")
         return jsonify({"error": "An error occurred during logout"}), 500
 
-@app.route("/api/auth/register", methods=["POST"])
+@app.route("/api/auth/register", methods=["POST", "OPTIONS"])
+@handle_options
 def register():
     """User registration endpoint"""
     try:
@@ -557,7 +557,7 @@ def change_password():
         return jsonify({"error": "An error occurred during password change"}), 500
 
 # User management endpoints (Admin only)
-@app.route("/api/admin/users", methods=["GET"])
+@app.route("/api/admin/users", methods=["GET", "OPTIONS"])
 @require_auth
 def get_users():
     """Get all users (Admin only)"""
@@ -591,7 +591,7 @@ def get_users():
         })
     return jsonify(user_list), 200
 
-@app.route("/api/admin/users/<int:user_id>", methods=["PUT"])
+@app.route("/api/admin/users/<int:user_id>", methods=["PUT", "OPTIONS"])
 @require_auth
 def update_user(user_id):
     """Update user role or status (Admin only)"""
@@ -634,7 +634,7 @@ def update_user(user_id):
     conn.close()
     return jsonify({"message": "User updated successfully"}), 200
 
-@app.route("/api/admin/users/<int:user_id>", methods=["DELETE"])
+@app.route("/api/admin/users/<int:user_id>", methods=["DELETE", "OPTIONS"])
 @require_auth
 def delete_user(user_id):
     """Delete a user (Admin only)"""
@@ -655,7 +655,7 @@ def delete_user(user_id):
     return jsonify({"message": "User deleted successfully"}), 200
 
 # Campaign management endpoints
-@app.route("/api/campaigns", methods=["POST"])
+@app.route("/api/campaigns", methods=["POST", "OPTIONS"])
 @require_auth
 def create_campaign():
     """Create a new campaign"""
@@ -683,7 +683,7 @@ def create_campaign():
     conn.close()
     return jsonify({"message": "Campaign created successfully", "campaign_id": campaign_id}), 201
 
-@app.route("/api/campaigns", methods=["GET"])
+@app.route("/api/campaigns", methods=["GET", "OPTIONS"])
 @require_auth
 def get_campaigns():
     """Get all campaigns for the current user or all campaigns if admin"""
@@ -720,7 +720,7 @@ def get_campaigns():
         })
     return jsonify(campaign_list), 200
 
-@app.route("/api/campaigns/<int:campaign_id>", methods=["GET"])
+@app.route("/api/campaigns/<int:campaign_id>", methods=["GET", "OPTIONS"])
 @require_auth
 def get_campaign(campaign_id):
     """Get a specific campaign by ID"""
@@ -757,7 +757,7 @@ def get_campaign(campaign_id):
         "status": campaign[5]
     }), 200
 
-@app.route("/api/campaigns/<int:campaign_id>", methods=["PUT"])
+@app.route("/api/campaigns/<int:campaign_id>", methods=["PUT", "OPTIONS"])
 @require_auth
 def update_campaign(campaign_id):
     """Update a campaign"""
@@ -833,7 +833,7 @@ def delete_campaign(campaign_id):
     return jsonify({"message": "Campaign deleted successfully"}), 200
 
 # Tracking link management endpoints
-@app.route("/api/tracking_links", methods=["POST"])
+@app.route("/api/tracking_links", methods=["POST", "OPTIONS"])
 @require_auth
 def create_tracking_link():
     """Create a new tracking link"""
@@ -895,7 +895,7 @@ def create_tracking_link():
     conn.close()
     return jsonify({"message": "Tracking link created successfully", "tracking_token": tracking_token, "link_id": link_id}), 201
 
-@app.route("/api/tracking_links", methods=["GET"])
+@app.route("/api/tracking_links", methods=["GET", "OPTIONS"])
 @require_auth
 def get_tracking_links():
     """Get all tracking links for the current user or all links if admin"""
@@ -948,7 +948,7 @@ def get_tracking_links():
         })
     return jsonify(link_list), 200
 
-@app.route("/api/tracking_links/<int:link_id>", methods=["GET"])
+@app.route("/api/tracking_links/<int:link_id>", methods=["GET", "OPTIONS"])
 @require_auth
 def get_tracking_link(link_id):
     """Get a specific tracking link by ID"""
@@ -1001,7 +1001,7 @@ def get_tracking_link(link_id):
         "creator_username": link[21]
     }), 200
 
-@app.route("/api/tracking_links/<int:link_id>", methods=["PUT"])
+@app.route("/api/tracking_links/<int:link_id>", methods=["PUT", "OPTIONS"])
 @require_auth
 def update_tracking_link(link_id):
     """Update a tracking link"""
@@ -1051,7 +1051,7 @@ def update_tracking_link(link_id):
     conn.close()
     return jsonify({"message": "Tracking link updated successfully"}), 200
 
-@app.route("/api/tracking_links/<int:link_id>", methods=["DELETE"])
+@app.route("/api/tracking_links/<int:link_id>", methods=["DELETE", "OPTIONS"])
 @require_auth
 def delete_tracking_link(link_id):
     """Delete a tracking link"""
@@ -1204,7 +1204,7 @@ def track_link(tracking_token):
     return redirect(original_url)
 
 # Analytics endpoints
-@app.route("/api/analytics/clicks", methods=["GET"])
+@app.route("/api/analytics/clicks", methods=["GET", "OPTIONS"])
 @require_auth
 def get_click_analytics():
     """Get click analytics data"""
@@ -1251,7 +1251,7 @@ def get_click_analytics():
         })
     return jsonify(click_list), 200
 
-@app.route("/api/analytics/summary", methods=["GET"])
+@app.route("/api/analytics/summary", methods=["GET", "OPTIONS"])
 @require_auth
 def get_summary_analytics():
     """Get summary analytics data"""
@@ -1312,7 +1312,7 @@ def get_summary_analytics():
         "unique_clicks": unique_clicks
     }), 200
 
-@app.route("/api/analytics/geo", methods=["GET"])
+@app.route("/api/analytics/geo", methods=["GET", "OPTIONS"])
 @require_auth
 def get_geo_analytics():
     """Get geographical click analytics"""
@@ -1342,7 +1342,7 @@ def get_geo_analytics():
         geo_list.append({"country": row[0], "count": row[1]})
     return jsonify(geo_list), 200
 
-@app.route("/api/analytics/device", methods=["GET"])
+@app.route("/api/analytics/device", methods=["GET", "OPTIONS"])
 @require_auth
 def get_device_analytics():
     """Get device type click analytics"""
@@ -1372,7 +1372,7 @@ def get_device_analytics():
         device_list.append({"device_type": row[0], "count": row[1]})
     return jsonify(device_list), 200
 
-@app.route("/api/analytics/browser", methods=["GET"])
+@app.route("/api/analytics/browser", methods=["GET", "OPTIONS"])
 @require_auth
 def get_browser_analytics():
     """Get browser click analytics"""
@@ -1402,7 +1402,7 @@ def get_browser_analytics():
         browser_list.append({"browser": row[0], "count": row[1]})
     return jsonify(browser_list), 200
 
-@app.route("/api/analytics/os", methods=["GET"])
+@app.route("/api/analytics/os", methods=["GET", "OPTIONS"])
 @require_auth
 def get_os_analytics():
     """Get operating system click analytics"""
@@ -1432,7 +1432,7 @@ def get_os_analytics():
         os_list.append({"os": row[0], "count": row[1]})
     return jsonify(os_list), 200
 
-@app.route("/api/analytics/time", methods=["GET"])
+@app.route("/api/analytics/time", methods=["GET", "OPTIONS"])
 @require_auth
 def get_time_analytics():
     """Get time-based click analytics"""
@@ -1462,7 +1462,7 @@ def get_time_analytics():
         time_list.append({"day": row[0].isoformat() if DATABASE_TYPE == "postgresql" else row[0], "count": row[1]})
     return jsonify(time_list), 200
 
-@app.route("/api/analytics/hourly", methods=["GET"])
+@app.route("/api/analytics/hourly", methods=["GET", "OPTIONS"])
 @require_auth
 def get_hourly_analytics():
     """Get hourly click analytics"""
@@ -1492,7 +1492,7 @@ def get_hourly_analytics():
         hourly_list.append({"hour": row[0].isoformat() if DATABASE_TYPE == "postgresql" else row[0], "count": row[1]})
     return jsonify(hourly_list), 200
 
-@app.route("/api/analytics/daily", methods=["GET"])
+@app.route("/api/analytics/daily", methods=["GET", "OPTIONS"])
 @require_auth
 def get_daily_analytics():
     """Get daily click analytics"""
@@ -1522,7 +1522,7 @@ def get_daily_analytics():
         daily_list.append({"day": row[0].isoformat() if DATABASE_TYPE == "postgresql" else row[0], "count": row[1]})
     return jsonify(daily_list), 200
 
-@app.route("/api/analytics/monthly", methods=["GET"])
+@app.route("/api/analytics/monthly", methods=["GET", "OPTIONS"])
 @require_auth
 def get_monthly_analytics():
     """Get monthly click analytics"""
